@@ -22,8 +22,8 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JSONIFY_PRETTYPRINT_REGULAR'] = False  # 这个配置通常无须更改
 app.config['JSON_AS_ASCII'] = False  # 确保 Flask 正确处理非 ASCII 字符
 # 跨域
-CORS(app, resources={r"/*": {"origins": "http://localhost:5173"}}) 
-socketio = SocketIO(app, cors_allowed_origins="http://localhost:5173")
+CORS(app, resources={r"/*": {"origins": "http://localhost:8080"}}) 
+socketio = SocketIO(app, cors_allowed_origins="http://localhost:8080")
 
 db = SQLAlchemy(app)
 # 加载 Vosk 模型

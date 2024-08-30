@@ -23,13 +23,20 @@
     <el-row justify="center" align="middle" style="margin-top: 20px">
       <el-col :span="16">
         <el-card>
-          <p>发言人{{ speaker_id }}</p>
+          <p>发言人：{{ speaker_id }}</p>
         </el-card>
         <el-card style="margin-top: 50px">
+          <p>实时文本</p>
           <p>{{ partial_text }}</p>
         </el-card>
-        <el-card style="margin-top: 50px">
-          <p>{{ final_text }}</p>
+        <el-card style="margin-top: 50px; height: 500px; overflow-y: auto">
+          <p>会议记录</p>
+          <div v-for="(text, index) in accumulatedTexts" :key="index">
+            <p>
+              <strong>{{ text.speaker }}:</strong>
+              {{ text.text }}
+            </p>
+          </div>
         </el-card>
       </el-col>
     </el-row>
@@ -38,23 +45,25 @@
 
 <script>
 import axios from "axios";
-import io from 'socket.io-client';
+import io from "socket.io-client";
 export default {
   data() {
     return {
-      transcriptions: [], // 存储实时转录内容
       audioContext: null,
       workletNode: null,
       ws: null,
       partial_text: "",
       final_text: "",
       speaker_id: null,
+      accumulatedTexts: [], //会议记录
       meeting_name: "",
     };
   },
   methods: {
     async startRecording() {
-      this.stopRecording();
+      if (this.ws) {
+        this.stopRecording();
+      }
 
       // 获取自动递增的会议名称
       try {
@@ -105,11 +114,16 @@ export default {
           const result = JSON.parse(data);
           this.final_text = result.text;
           this.speaker_id = result.spk;
+          // 累计显示的文本
+          this.accumulatedTexts.push({
+            speaker: this.speaker_id,
+            text: this.final_text,
+          });
         });
 
         this.workletNode.port.onmessage = (event) => {
           if (this.ws.connected) {
-            this.ws.emit('audio_data', event.data);
+            this.ws.emit("audio_data", event.data);
           }
         };
 
@@ -138,6 +152,10 @@ export default {
         this.ws.disconnect();
         console.log("WebSocket connection closed");
       }
+      await axios.post("http://localhost:5000/store_text", {
+        meeting_name: this.meeting_name,
+        text_name: "recoding_text",
+      });
       this.final_text = "";
       this.partial_text = "";
       this.speaker_id = null;

@@ -18,7 +18,7 @@
     <!-- Summary Dialog -->
     <el-dialog
       title="会议摘要"
-      v-model:visible="dialogVisible"
+      v-model="dialogVisible"
       width="50%"
       @close="dialogVisible = false"
     >
