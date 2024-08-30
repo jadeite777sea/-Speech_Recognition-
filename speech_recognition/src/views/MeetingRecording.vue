@@ -23,6 +23,9 @@
     <el-row justify="center" align="middle" style="margin-top: 20px">
       <el-col :span="16">
         <el-card>
+          <p>发言人{{ speaker_id }}</p>
+        </el-card>
+        <el-card style="margin-top: 50px">
           <p>{{ partial_text }}</p>
         </el-card>
         <el-card style="margin-top: 50px">
@@ -35,7 +38,7 @@
 
 <script>
 import axios from "axios";
-
+import io from 'socket.io-client';
 export default {
   data() {
     return {
@@ -89,33 +92,28 @@ export default {
           "my-processor"
         );
 
-        this.ws = new WebSocket("ws://localhost:5000");
-
-        this.ws.onopen = () => {
+        this.ws = io("http://localhost:5000");
+        this.ws.on("connect", () => {
           console.log("WebSocket connection opened");
-        };
+        });
 
-        this.ws.onmessage = (event) => {
-          const result = JSON.parse(event.data);
-          if ("partial" in result) {
-            this.partial_text = result["partial"];
-          }
-          if ("text" in result) {
-            this.partial_text = result["text"];
-            this.final_text = result["text"];
-            this.speaker_id = result["spk"];
-          }
-        };
+        this.ws.on("partial_result", (data) => {
+          const result = JSON.parse(data);
+          this.partial_text = result.partial;
+        });
+        this.ws.on("final_result", (data) => {
+          const result = JSON.parse(data);
+          this.final_text = result.text;
+          this.speaker_id = result.spk;
+        });
 
         this.workletNode.port.onmessage = (event) => {
-          if (this.ws.readyState === WebSocket.OPEN) {
-            this.ws.send(event.data);
+          if (this.ws.connected) {
+            this.ws.emit('audio_data', event.data);
           }
         };
 
         source.connect(this.workletNode);
-        // this.workletNode.connect(this.audioContext.destination);
-        // source.connect(this.audioContext.destination);
       } catch (error) {
         console.error(
           "Error accessing microphone or initializing AudioContext: ",
@@ -137,28 +135,12 @@ export default {
       }
 
       if (this.ws) {
-        this.ws.close();
+        this.ws.disconnect();
         console.log("WebSocket connection closed");
       }
-
-      // 将final_text发送到后端
-      if (this.final_text) {
-        try {
-          const response = await axios.post(
-            "http://localhost:5000/store_text",
-            {
-              text_name: "final_transcription",
-              meeting_name: this.meeting_name, // 可以根据实际情况调整会议名称
-            }
-          );
-          console.log("Text sent to backend:", response.data);
-        } catch (error) {
-          console.error("Error sending text to backend:", error);
-        }
-      }
-
       this.final_text = "";
       this.partial_text = "";
+      this.speaker_id = null;
     },
   },
 };

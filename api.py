@@ -6,6 +6,10 @@ import json
 from summary import generator
 from sqlalchemy.orm import relationship
 import copy
+from vosk import Model, KaldiRecognizer, SpkModel,SetLogLevel
+import numpy as np
+from flask_socketio import SocketIO, emit
+from flask_cors import CORS
 
 app = Flask(__name__)
 api = Api(app)
@@ -17,11 +21,43 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 app.config['JSONIFY_PRETTYPRINT_REGULAR'] = False  # 这个配置通常无须更改
 app.config['JSON_AS_ASCII'] = False  # 确保 Flask 正确处理非 ASCII 字符
+# 跨域
+CORS(app, resources={r"/*": {"origins": "http://localhost:5173"}}) 
+socketio = SocketIO(app, cors_allowed_origins="http://localhost:5173")
 
 db = SQLAlchemy(app)
+# 加载 Vosk 模型
+model_path = "vosk-model-cn-0.22"
+SetLogLevel(-1)
+model = Model(model_path)
+recognizer = KaldiRecognizer(model, 16000)
+# 加载说话人识别模型
+spk_model_path = "vosk-model-spk-0.4"
+spk_model = SpkModel(spk_model_path)  
+recognizer.SetSpkModel(spk_model)
 
 
+speaker_list = []
+id = 1
+threshold = 0.5
 content_g=""
+
+# 计算两个向量的余弦距离，距离越小说明两个向量越相似
+def cosine_dist(x, y):
+    nx = np.array(x)
+    ny = np.array(y)
+    return 1 - np.dot(nx, ny) / np.linalg.norm(nx) / np.linalg.norm(ny)
+
+def check_speaker(vector):
+    global id
+    for index, item in enumerate(speaker_list):
+        dist = cosine_dist(vector, item)
+        print(dist)
+        if dist < threshold:
+            id = index + 1
+            return
+    speaker_list.append(vector)
+    id = len(speaker_list)
 # 定义数据库模型
 class Text(db.Model):
     __tablename__ = 'texts'
@@ -56,6 +92,37 @@ text_store_model = api.model('TextStore', {
     'text_name': fields.String(required=True, description='The name of the text'),
     'meeting_name': fields.String(required=True, description='The name of the meeting')
 })
+
+
+# 处理客户端发送的音频数据
+@socketio.on('audio_data')
+def handle_audio_data(audio_data):
+    global recognizer
+    global content_g
+    # 处理音频数据
+    if recognizer.AcceptWaveform(audio_data):
+        final_result = json.loads(recognizer.Result())
+        if final_result['text'] != "":
+            final_result['text'] = final_result['text'].replace(' ', '')
+            check_speaker(final_result['spk'])
+            final_result['spk'] = id
+            content_g = content_g +str(id) +":"+final_result['text'] +"\n"
+            # 广播最终识别结果给所有客户端
+            emit('final_result', json.dumps(final_result), broadcast=True)
+    else:
+        partial_result = json.loads(recognizer.PartialResult())
+        if partial_result['partial'] != "":
+            partial_result['partial'] = partial_result['partial'].replace(' ', '')
+            # 广播部分识别结果给所有客户端
+            emit('partial_result', json.dumps(partial_result), broadcast=True)
+
+# 客户端断开连接处理
+@socketio.on('disconnect')
+def handle_disconnect():
+    global recognizer
+    recognizer.Reset()
+    print(f"Client disconnected: {request.remote_addr}")
+
 
 @api.route('/store_text')
 class StoreText(Resource):
@@ -279,6 +346,5 @@ class ProcessText(Resource):
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
-
-
+    print("WebSocket server started on http://localhost:5000")
+    socketio.run(app, host="localhost", port=5000)
