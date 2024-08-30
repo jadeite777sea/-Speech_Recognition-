@@ -34,6 +34,8 @@
 </template>
 
 <script>
+import axios from "axios";
+
 export default {
   data() {
     return {
@@ -44,11 +46,35 @@ export default {
       partial_text: "",
       final_text: "",
       speaker_id: null,
+      meeting_name: "",
     };
   },
   methods: {
     async startRecording() {
       this.stopRecording();
+
+      // 获取自动递增的会议名称
+      try {
+        const response = await axios.get(
+          "http://localhost:5000/get_all_meetings"
+        );
+        const meetingNames = response.data.meetings;
+
+        // 计算下一个会议名称
+        const nextMeetingNumber = meetingNames.length + 1;
+        this.meeting_name = `Meeting${nextMeetingNumber}`;
+
+        // 向后端创建新会议
+        await axios.post("http://localhost:5000/create_meeting", {
+          meeting_name: this.meeting_name,
+        });
+
+        console.log("New meeting created:", this.meeting_name);
+      } catch (error) {
+        console.error("Error fetching or creating meeting:", error);
+        return;
+      }
+
       // 开始录音并接收转录内容的逻辑
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -98,7 +124,7 @@ export default {
       }
     },
 
-    stopRecording() {
+    async stopRecording() {
       // 停止录音的逻辑
       if (this.workletNode) {
         this.workletNode.disconnect();
@@ -114,6 +140,24 @@ export default {
         this.ws.close();
         console.log("WebSocket connection closed");
       }
+
+      // 将final_text发送到后端
+      if (this.final_text) {
+        try {
+          const response = await axios.post(
+            "http://localhost:5000/store_text",
+            {
+              text_name: "final_transcription",
+              meeting_name: this.meeting_name, // 可以根据实际情况调整会议名称
+            }
+          );
+          console.log("Text sent to backend:", response.data);
+        } catch (error) {
+          console.error("Error sending text to backend:", error);
+        }
+      }
+
+      this.final_text = "";
       this.partial_text = "";
     },
   },
