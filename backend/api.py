@@ -106,7 +106,7 @@ def handle_audio_data(audio_data):
             final_result['text'] = final_result['text'].replace(' ', '')
             check_speaker(final_result['spk'])
             final_result['spk'] = id
-            content_g = content_g +str(id) +":"+final_result['text'] +"\n"
+            content_g += "User" + str(id) +":"+final_result['text'] +"\n"
             # 广播最终识别结果给所有客户端
             emit('final_result', json.dumps(final_result), broadcast=True)
     else:

@@ -1,10 +1,10 @@
 # 说明
 
-pull代码后需设置部分：  
+pull代码后需设置部分：
 
-1. 按照`语音识别模型`部分下载模型并解压  
-2. 修改[api.py](https://github.com/jadeite777sea/-Speech_Recognition-/blob/master/backend/api.py)中的`SQLALCHEMY_DATABASE_URI`为自己的mysql数据库
-3. 如果前端默认端口不为`8080`，在上一条位置附近修改`#跨域`相关端口
+1. 按照 `语音识别模型`部分下载模型并解压
+2. 修改[api.py](https://github.com/jadeite777sea/-Speech_Recognition-/blob/master/backend/api.py)中的 `SQLALCHEMY_DATABASE_URI`为自己的mysql数据库
+3. 如果前端默认端口不为 `8080`，在上一条位置附近修改 `#跨域`相关端口
 4. pip 安装缺少的python依赖
 5. 启动前后端
 
@@ -22,7 +22,7 @@ pull代码后需设置部分：
 
 ## 语音识别模型
 
-语音识别模型地址
+### 语音识别模型地址
 
 [https://alphacephei.com/vosk/models](https://alphacephei.com/vosk/models)
 
@@ -31,3 +31,11 @@ pull代码后需设置部分：
 和        vosk-model-spk-0.4  (13M 在最下面  Speaker identification model)
 
 下载下来  都解压到  api.py同级目录   或者 更改api.py文件里的模型路径
+
+### 注意事项
+
+* 模型对常见的词汇能够较好的识别，仅能对单一语音进行识别。
+* 在语音测试时，尽量说话声音洪亮清晰。
+
+* 保证在同一时间仅有一个人在说话。
+* 如果声音很混乱，不仅会使得模型准确率降低，也会使得发言人模型结果不理想，影响整个程序的运行效率。
