@@ -22,8 +22,8 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JSONIFY_PRETTYPRINT_REGULAR'] = False  # 这个配置通常无须更改
 app.config['JSON_AS_ASCII'] = False  # 确保 Flask 正确处理非 ASCII 字符
 # 跨域
-CORS(app, resources={r"/*": {"origins": "http://localhost:8080"}}) 
-socketio = SocketIO(app, cors_allowed_origins="http://localhost:8080")
+CORS(app, resources={r"/*": {"origins": "http://localhost:8081"}}) 
+socketio = SocketIO(app, cors_allowed_origins="http://localhost:8081")
 
 db = SQLAlchemy(app)
 # 加载 Vosk 模型
@@ -107,6 +107,7 @@ def handle_audio_data(audio_data):
             check_speaker(final_result['spk'])
             final_result['spk'] = id
             content_g += "User" + str(id) +":"+final_result['text'] +"\n"
+            print(content_g)
             # 广播最终识别结果给所有客户端
             emit('final_result', json.dumps(final_result), broadcast=True)
     else:
@@ -136,7 +137,6 @@ class StoreText(Resource):
 
             global content_g
             text_content_g = copy.copy(content_g)
-            content_g = ''
 
             # 查找指定的会议名称
             meeting = Meeting.query.filter_by(meeting_name=meeting_name).first()
@@ -320,19 +320,17 @@ class ProcessText(Resource):
     @api.doc(description='Accept text content, process it, and return the summmary')
     def post(self):
         try:
-            # 获取请求中的 JSON 数据
             data = request.json
             content = data.get('content')
-            
-            # 处理文本内容
-            processed_content = generator(content).content
-
             global content_g
-
-            content_g=copy.copy(processed_content)
-
-
-            
+            processed_content = generator(content_g).content
+            content_g=''
+            meeting = Meeting.query.filter_by(meeting_name=content).first()
+            if not meeting:
+                return {'message': 'Meeting not found'}, 404
+            new_text = Text(table_name=content+'_abstract', text_content=processed_content, meeting_id=meeting.id)
+            db.session.add(new_text)
+            db.session.commit()
             # 构建响应数据
             response_data = {'processed_content': processed_content}
             response_json = json.dumps(response_data)

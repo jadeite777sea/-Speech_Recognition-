@@ -65,7 +65,7 @@ export default {
           content: meeting_name, // 传递会议名称作为示例内容
         })
         .then((response) => {
-          this.summaryContent = response.data.response_json;
+          this.summaryContent = response.data.processed_content;
           this.dialogVisible = true; // 显示对话框
         })
         .catch((error) => {
